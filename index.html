@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Electrical BOM Extractor</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1a1a1a;background:#f5f5f3;min-height:100vh;padding:2rem 1rem}
+.container{max-width:1100px;margin:0 auto}
+header{margin-bottom:2rem}
+header h1{font-size:22px;font-weight:500;margin-bottom:4px}
+header p{font-size:14px;color:#666}
+.upload-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.panel{border:0.5px solid #ddd;border-radius:12px;overflow:hidden;background:#fff}
+.panel-head{padding:10px 14px;border-bottom:0.5px solid #eee;background:#f9f9f7;display:flex;align-items:center;gap:9px}
+.step-num{width:20px;height:20px;border-radius:50%;background:#1a1a1a;color:#fff;font-size:10px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ph-title{font-size:13px;font-weight:500}
+.ph-sub{font-size:11px;color:#888}
+.tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:6px;font-weight:500;margin-left:6px;vertical-align:middle}
+.tag-req{background:#FCEBEB;color:#791F1F}
+.tag-opt{background:#FAEEDA;color:#633806}
+.drop-zone{padding:1.5rem 1rem;text-align:center;cursor:pointer;background:#fff;min-height:110px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;transition:background 0.15s}
+.drop-zone:hover,.drop-zone.drag-over{background:#EEF5FD}
+.drop-zone svg{color:#999;margin-bottom:2px}
+.dz-label{font-size:12px;color:#666}
+.dz-fmt{font-size:11px;color:#aaa}
+.file-pill{display:inline-flex;align-items:center;gap:4px;background:#EAF3DE;color:#27500A;font-size:11px;padding:3px 8px;border-radius:6px;margin-top:4px}
+.btn-primary{display:flex;align-items:center;justify-content:center;gap:8px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:14px;font-weight:500;cursor:pointer;width:100%;margin-bottom:14px;transition:opacity 0.15s}
+.btn-primary:disabled{opacity:0.35;cursor:not-allowed}
+.btn-primary:hover:not(:disabled){opacity:0.8}
+.btn-sm{display:inline-flex;align-items:center;gap:5px;background:transparent;color:#1a1a1a;border:0.5px solid #ccc;border-radius:6px;padding:5px 11px;font-size:11px;cursor:pointer;transition:background 0.15s}
+.btn-sm:hover{background:#f5f5f3}
+.btn-sm:disabled{opacity:0.35;cursor:not-allowed}
+.bom-section{border:0.5px solid #ddd;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#fff}
+.section-head{padding:10px 14px;border-bottom:0.5px solid #eee;display:flex;align-items:center;justify-content:space-between}
+.hv-head{background:#FAECE7}
+.lv-head{background:#E6F1FB}
+.hv-label{font-size:13px;font-weight:500;color:#712B13}
+.hv-sub{font-size:11px;color:#993C1D;margin-top:1px}
+.lv-label{font-size:13px;font-weight:500;color:#0C447C}
+.lv-sub{font-size:11px;color:#185FA5;margin-top:1px}
+.hv-icon{width:28px;height:28px;border-radius:6px;background:#F0997B;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.lv-icon{width:28px;height:28px;border-radius:6px;background:#85B7EB;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.section-head-left{display:flex;align-items:center;gap:10px}
+.metrics-row{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:0.5px solid #eee}
+.metric{padding:8px 12px;border-right:0.5px solid #eee}
+.metric:last-child{border-right:none}
+.metric .val{font-size:18px;font-weight:500}
+.metric .lbl{font-size:10px;color:#888;margin-top:1px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+thead th{padding:8px 9px;text-align:left;font-weight:500;font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;border-bottom:0.5px solid #eee;background:#f9f9f7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+tbody tr{border-bottom:0.5px solid #eee}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:#f9f9f7}
+td{padding:8px 9px;vertical-align:top;overflow:hidden;text-overflow:ellipsis}
+td.edit{cursor:text}
+td.edit:focus{outline:none;background:#EEF5FD}
+.badge{display:inline-block;font-size:10px;padding:2px 6px;border-radius:6px;font-weight:500;white-space:nowrap}
+.b-coral{background:#FAECE7;color:#712B13}
+.b-blue{background:#E6F1FB;color:#0C447C}
+.b-amber{background:#FAEEDA;color:#633806}
+.b-purple{background:#EEEDFE;color:#3C3489}
+.b-green{background:#EAF3DE;color:#27500A}
+.b-gray{background:#F1EFE8;color:#444441}
+.b-teal{background:#E1F5EE;color:#085041}
+.status-bar{display:flex;align-items:center;gap:9px;padding:10px 14px;font-size:12px;color:#666;background:#fff;border:0.5px solid #ddd;border-radius:8px;margin-bottom:14px}
+.spinner{width:14px;height:14px;border:2px solid #ddd;border-top-color:#1a1a1a;border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err-bar{padding:10px 14px;background:#FCEBEB;color:#791F1F;font-size:12px;border-radius:8px;margin-bottom:14px;border:0.5px solid #F7C1C1}
+.empty{padding:2rem;text-align:center;color:#bbb;font-size:12px}
+.empty svg{display:block;margin:0 auto 8px;color:#ddd}
+input[type=file]{display:none}
+.col-no{width:36px}.col-ref{width:72px}.col-desc{width:160px}.col-qty{width:42px}.col-unit{width:38px}.col-cat{width:100px}.col-mfr{width:90px}.col-part{width:90px}.col-vr{width:100px}.col-notes{width:130px}
+.footer{text-align:center;margin-top:2rem;font-size:11px;color:#aaa}
+@media(max-width:600px){.upload-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Electrical BOM extractor</h1>
+    <p>Upload your line diagram — specification is optional but improves accuracy. BOM is split into high voltage and low voltage.</p>
+  </header>
+  <div class="upload-row">
+    <div class="panel">
+      <div class="panel-head">
+        <div class="step-num">1</div>
+        <div>
+          <div class="ph-title">Line diagram <span class="tag tag-req">required</span></div>
+          <div class="ph-sub">Single-line · wiring · schematic</div>
+        </div>
+      </div>
+      <div class="drop-zone" id="dz-d" onclick="document.getElementById('inp-d').click()">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <div class="dz-label">Click or drag to upload</div>
+        <div class="dz-fmt">PNG · JPG · PDF</div>
+        <div id="d-pill"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div class="step-num">2</div>
+        <div>
+          <div class="ph-title">Specification document <span class="tag tag-opt">optional</span></div>
+          <div class="ph-sub">Equipment schedule · data sheets</div>
+        </div>
+      </div>
+      <div class="drop-zone" id="dz-s" onclick="document.getElementById('inp-s').click()">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <div class="dz-label">Click or drag to upload</div>
+        <div class="dz-fmt">PDF · TXT</div>
+        <div id="s-pill"></div>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="inp-d" accept="image/*,.pdf">
+  <input type="file" id="inp-s" accept=".pdf,.txt,application/pdf,text/plain">
+  <button class="btn-primary" id="btn-ex" disabled onclick="extract()">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></svg>
+    Extract bill of materials
+  </button>
+  <div id="status-area"></div>
+  <div class="bom-section">
+    <div class="section-head hv-head">
+      <div class="section-head-left">
+        <div class="hv-icon"><svg width="14" height="14" fill="none" stroke="#712B13" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
+        <div><div class="hv-label">High voltage</div><div class="hv-sub">Above 1000V AC / 1500V DC</div></div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn-sm" id="hv-csv" disabled onclick="dlCSV('hv')">&#8595; CSV</button>
+        <button class="btn-sm" id="hv-json" disabled onclick="dlJSON('hv')">{} JSON</button>
+      </div>
+    </div>
+    <div id="hv-metrics" style="display:none" class="metrics-row">
+      <div class="metric"><div class="val" id="hv-m1">0</div><div class="lbl">Items</div></div>
+      <div class="metric"><div class="val" id="hv-m2">0</div><div class="lbl">Total units</div></div>
+      <div class="metric"><div class="val" id="hv-m3">0</div><div class="lbl">Categories</div></div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th class="col-no">#</th><th class="col-ref">Tag / ref</th><th class="col-desc">Description</th>
+        <th class="col-qty">Qty</th><th class="col-unit">Unit</th><th class="col-cat">Category</th>
+        <th class="col-mfr">Manufacturer</th><th class="col-part">Part / model</th>
+        <th class="col-vr">Voltage / rating</th><th class="col-notes">Notes</th>
+      </tr></thead>
+      <tbody id="hv-body"><tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>High voltage items will appear here</div></td></tr></tbody>
+    </table></div>
+  </div>
+  <div class="bom-section">
+    <div class="section-head lv-head">
+      <div class="section-head-left">
+        <div class="lv-icon"><svg width="14" height="14" fill="none" stroke="#0C447C" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 0v4m0 14v-4M2 12h4m14 0h-4"/></svg></div>
+        <div><div class="lv-label">Low voltage</div><div class="lv-sub">Up to 1000V AC / 1500V DC</div></div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn-sm" id="lv-csv" disabled onclick="dlCSV('lv')">&#8595; CSV</button>
+        <button class="btn-sm" id="lv-json" disabled onclick="dlJSON('lv')">{} JSON</button>
+      </div>
+    </div>
+    <div id="lv-metrics" style="display:none" class="metrics-row">
+      <div class="metric"><div class="val" id="lv-m1">0</div><div class="lbl">Items</div></div>
+      <div class="metric"><div class="val" id="lv-m2">0</div><div class="lbl">Total units</div></div>
+      <div class="metric"><div class="val" id="lv-m3">0</div><div class="lbl">Categories</div></div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th class="col-no">#</th><th class="col-ref">Tag / ref</th><th class="col-desc">Description</th>
+        <th class="col-qty">Qty</th><th class="col-unit">Unit</th><th class="col-cat">Category</th>
+        <th class="col-mfr">Manufacturer</th><th class="col-part">Part / model</th>
+        <th class="col-vr">Voltage / rating</th><th class="col-notes">Notes</th>
+      </tr></thead>
+      <tbody id="lv-body"><tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 0v4m0 14v-4M2 12h4m14 0h-4"/></svg>Low voltage items will appear here</div></td></tr></tbody>
+    </table></div>
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin-top:4px">
+    <button class="btn-sm" id="btn-clear" style="display:none" onclick="clearAll()">&#8635; Clear all</button>
+  </div>
+  <div class="footer">Powered by Claude · Edit the API_KEY constant in this file to update your key</div>
+</div>
+<script>
+const API_KEY = "paste-your-key-here";
+
+let dFile=null,sFile=null,hvData=[],lvData=[];
+const catBadge=c=>{const m={'Transformer':'b-coral','HV switchgear':'b-coral','HV circuit breaker':'b-coral','HV cable':'b-coral','HV busbar':'b-coral','HV fuse':'b-coral','HV isolator':'b-coral','HV surge arrester':'b-coral','Generator':'b-purple','Earthing':'b-gray','Circuit breaker':'b-blue','Distribution board':'b-blue','MCC':'b-blue','Panel':'b-blue','LV switchgear':'b-blue','Cable':'b-amber','Conduit':'b-amber','Trunking':'b-amber','Motor':'b-purple','Drive':'b-purple','VFD':'b-purple','UPS':'b-purple','Relay':'b-teal','Contactor':'b-teal','Luminaire':'b-green','Switch':'b-green','Socket':'b-green','Outlet':'b-green','Sensor':'b-green','Detector':'b-green','Meter':'b-teal','Instrument':'b-teal','Other':'b-gray'};return `<span class="badge ${m[c]||'b-gray'}">${c||'Other'}</span>`;};
+function toB64(f){return new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result.split(',')[1]);rd.onerror=j;rd.readAsDataURL(f);})}
+function setFile(t,f){if(t==='d'){dFile=f;document.getElementById('d-pill').innerHTML=`<span class="file-pill">&#10003; ${f.name.slice(0,20)}${f.name.length>20?'…':''}</span>`;}else{sFile=f;document.getElementById('s-pill').innerHTML=`<span class="file-pill">&#10003; ${f.name.slice(0,20)}${f.name.length>20?'…':''}</span>`;}document.getElementById('btn-ex').disabled=!dFile;}
+document.getElementById('inp-d').onchange=e=>{if(e.target.files[0])setFile('d',e.target.files[0])};
+document.getElementById('inp-s').onchange=e=>{if(e.target.files[0])setFile('s',e.target.files[0])};
+['dz-d','dz-s'].forEach(id=>{const el=document.getElementById(id);el.addEventListener('dragover',e=>{e.preventDefault();el.classList.add('drag-over')});el.addEventListener('dragleave',()=>el.classList.remove('drag-over'));el.addEventListener('drop',e=>{e.preventDefault();el.classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)setFile(id==='dz-d'?'d':'s',f);});});
+function setSt(msg){document.getElementById('status-area').innerHTML=msg?`<div class="status-bar"><div class="spinner"></div><span>${msg}</span></div>`:'';}
+function setErr(msg){document.getElementById('status-area').innerHTML=`<div class="err-bar">&#9888; ${msg}</div>`;}
+async function extract(){
+  if(!API_KEY||API_KEY==='paste-your-key-here'){setErr('No API key set. Edit this file and replace paste-your-key-here with your Anthropic API key.');return;}
+  document.getElementById('btn-ex').disabled=true;
+  ['hv-csv','hv-json','lv-csv','lv-json'].forEach(id=>document.getElementById(id).disabled=true);
+  document.getElementById('btn-clear').style.display='none';
+  document.getElementById('hv-metrics').style.display='none';
+  document.getElementById('lv-metrics').style.display='none';
+  document.getElementById('hv-body').innerHTML='';
+  document.getElementById('lv-body').innerHTML='';
+  setSt('Reading files…');
+  const content=[];
+  if(dFile){const b=await toB64(dFile);content.push(dFile.type.startsWith('image/')?{type:'image',source:{type:'base64',media_type:dFile.type,data:b}}:{type:'document',source:{type:'base64',media_type:'application/pdf',data:b}});}
+  if(sFile){if(sFile.type==='text/plain'){const t=await sFile.text();content.push({type:'text',text:`SPECIFICATION:\n${t}`});}else{const b=await toB64(sFile);content.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:b}});}}
+  content.push({type:'text',text:`You are a senior electrical engineer. Analyse the provided electrical diagram(s)${sFile?' and specification document':''}and produce a complete Bill of Materials separated into HIGH VOLTAGE and LOW VOLTAGE sections.\n\nCLASSIFICATION RULES:\n- High voltage (HV): equipment rated above 1000V AC or 1500V DC.\n- Low voltage (LV): equipment rated at 1000V AC or below.\n- If a transformer steps down from HV to LV, place it in HV.\n\nFor each item extract: tag_ref, description, quantity (integer), unit (EA/m/set/lot), category, manufacturer (or null), part_model (or null), voltage_rating, notes.\n\nHV categories (use exactly): HV circuit breaker, HV switchgear, HV cable, HV busbar, HV fuse, HV isolator, HV surge arrester, Transformer, Generator, Earthing, Other\nLV categories (use exactly): Circuit breaker, Distribution board, MCC, Panel, LV switchgear, Cable, Conduit, Trunking, Motor, Drive, VFD, UPS, Relay, Contactor, Luminaire, Switch, Socket, Outlet, Sensor, Detector, Meter, Instrument, Earthing, Other\n\nReturn ONLY valid JSON, no markdown:\n{"project_title":"inferred name","hv_items":[{"item_no":"1","tag_ref":"T-01","description":"...","quantity":1,"unit":"EA","category":"Transformer","manufacturer":null,"part_model":null,"voltage_rating":"11kV/415V 1000kVA","notes":"..."}],"lv_items":[{"item_no":"1","tag_ref":"DB-A","description":"...","quantity":1,"unit":"EA","category":"Distribution board","manufacturer":null,"part_model":null,"voltage_rating":"415V 800A","notes":"..."}],"summary":"1-2 sentence summary"}`});
+  setSt('AI is reading your electrical diagram…');
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:4000,messages:[{role:'user',content}]})});
+    const data=await res.json();
+    if(data.error)throw new Error(data.error.message);
+    const raw=data.content.map(c=>c.text||'').join('');
+    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    hvData=parsed.hv_items||[];lvData=parsed.lv_items||[];
+    setSt('');
+    if(parsed.summary)document.getElementById('status-area').innerHTML=`<div style="font-size:11px;color:#888;margin-bottom:10px">${parsed.summary}</div>`;
+    renderSection('hv',hvData);renderSection('lv',lvData);
+    ['hv-csv','hv-json','lv-csv','lv-json'].forEach(id=>document.getElementById(id).disabled=false);
+    document.getElementById('btn-clear').style.display='';
+    document.getElementById('btn-ex').disabled=false;
+  }catch(e){setErr('Extraction failed: '+e.message);document.getElementById('btn-ex').disabled=false;}
+}
+function renderSection(type,items){
+  const totalQty=items.reduce((s,i)=>s+(parseInt(i.quantity)||1),0);
+  const cats=new Set(items.map(i=>i.category).filter(Boolean));
+  document.getElementById(`${type}-m1`).textContent=items.length;
+  document.getElementById(`${type}-m2`).textContent=totalQty;
+  document.getElementById(`${type}-m3`).textContent=cats.size;
+  document.getElementById(`${type}-metrics`).style.display='grid';
+  const label=type==='hv'?'High':'Low';
+  document.getElementById(`${type}-body`).innerHTML=items.length?items.map((it,i)=>`<tr><td class="col-no" style="color:#aaa">${it.item_no||i+1}</td><td class="col-ref"><code style="font-size:10px;font-family:monospace">${it.tag_ref||'—'}</code></td><td class="col-desc edit" contenteditable="true">${it.description||'—'}</td><td class="col-qty edit" contenteditable="true" style="font-weight:500">${it.quantity??'—'}</td><td class="col-unit" style="color:#888">${it.unit||'EA'}</td><td class="col-cat">${catBadge(it.category)}</td><td class="col-mfr edit" contenteditable="true">${it.manufacturer||'—'}</td><td class="col-part edit" contenteditable="true" style="font-family:monospace;font-size:10px">${it.part_model||'—'}</td><td class="col-vr" style="font-size:10px">${it.voltage_rating||'—'}</td><td class="col-notes" style="font-size:10px;color:#888">${it.notes||''}</td></tr>`).join(''):`<tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>No ${label.toLowerCase()} voltage items found</div></td></tr>`;
+}
+function getTableData(type){return[...document.querySelectorAll(`#${type}-body tr`)].map(tr=>{const c=tr.querySelectorAll('td');if(c.length<10)return null;return{item_no:c[0].textContent.trim(),tag_ref:c[1].textContent.trim(),description:c[2].textContent.trim(),quantity:c[3].textContent.trim(),unit:c[4].textContent.trim(),category:c[5].textContent.trim(),manufacturer:c[6].textContent.trim(),part_model:c[7].textContent.trim(),voltage_rating:c[8].textContent.trim(),notes:c[9].textContent.trim()};}).filter(Boolean);}
+function dlCSV(type){const data=getTableData(type);const h=['Item no','Tag/ref','Description','Quantity','Unit','Category','Manufacturer','Part/model','Voltage/rating','Notes'];const rows=data.map(it=>[it.item_no,it.tag_ref,it.description,it.quantity,it.unit,it.category,it.manufacturer,it.part_model,it.voltage_rating,it.notes].map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(','));const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[h.join(','),...rows].join('\n')],{type:'text/csv'}));a.download=`${type}-bom.csv`;a.click();}
+function dlJSON(type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(getTableData(type),null,2)],{type:'application/json'}));a.download=`${type}-bom.json`;a.click();}
+function clearAll(){dFile=null;sFile=null;hvData=[];lvData=[];['d-pill','s-pill'].forEach(id=>document.getElementById(id).innerHTML='');['inp-d','inp-s'].forEach(id=>document.getElementById(id).value='');document.getElementById('status-area').innerHTML='';['hv','lv'].forEach(t=>{document.getElementById(`${t}-metrics`).style.display='none';document.getElementById(`${t}-body`).innerHTML=`<tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>${t==='hv'?'High':'Low'} voltage items will appear here</div></td></tr>`;});document.getElementById('btn-ex').disabled=true;['hv-csv','hv-json','lv-csv','lv-json'].forEach(id=>document.getElementById(id).disabled=true);document.getElementById('btn-clear').style.display='none';}
+</script>
+</body>
+</html>
