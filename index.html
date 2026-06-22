@@ -180,7 +180,7 @@ input[type=file]{display:none}
   <div class="footer">Powered by Claude · Edit the API_KEY constant in this file to update your key</div>
 </div>
 <script>
-const API_KEY = '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';
+const API_ENDPOINT = '/api/extract';
 
 let dFile=null,sFile=null,hvData=[],lvData=[];
 const catBadge=c=>{const m={'Transformer':'b-coral','HV switchgear':'b-coral','HV circuit breaker':'b-coral','HV cable':'b-coral','HV busbar':'b-coral','HV fuse':'b-coral','HV isolator':'b-coral','HV surge arrester':'b-coral','Generator':'b-purple','Earthing':'b-gray','Circuit breaker':'b-blue','Distribution board':'b-blue','MCC':'b-blue','Panel':'b-blue','LV switchgear':'b-blue','Cable':'b-amber','Conduit':'b-amber','Trunking':'b-amber','Motor':'b-purple','Drive':'b-purple','VFD':'b-purple','UPS':'b-purple','Relay':'b-teal','Contactor':'b-teal','Luminaire':'b-green','Switch':'b-green','Socket':'b-green','Outlet':'b-green','Sensor':'b-green','Detector':'b-green','Meter':'b-teal','Instrument':'b-teal','Other':'b-gray'};return `<span class="badge ${m[c]||'b-gray'}">${c||'Other'}</span>`;};
@@ -192,7 +192,6 @@ document.getElementById('inp-s').onchange=e=>{if(e.target.files[0])setFile('s',e
 function setSt(msg){document.getElementById('status-area').innerHTML=msg?`<div class="status-bar"><div class="spinner"></div><span>${msg}</span></div>`:'';}
 function setErr(msg){document.getElementById('status-area').innerHTML=`<div class="err-bar">&#9888; ${msg}</div>`;}
 async function extract(){
-  if(!API_KEY||API_KEY==='paste-your-key-here'){setErr('No API key set. Edit this file and replace paste-your-key-here with your Anthropic API key.');return;}
   document.getElementById('btn-ex').disabled=true;
   ['hv-csv','hv-json','lv-csv','lv-json'].forEach(id=>document.getElementById(id).disabled=true);
   document.getElementById('btn-clear').style.display='none';
@@ -207,7 +206,7 @@ async function extract(){
   content.push({type:'text',text:`You are a senior electrical engineer. Analyse the provided electrical diagram(s)${sFile?' and specification document':''}and produce a complete Bill of Materials separated into HIGH VOLTAGE and LOW VOLTAGE sections.\n\nCLASSIFICATION RULES:\n- High voltage (HV): equipment rated above 1000V AC or 1500V DC.\n- Low voltage (LV): equipment rated at 1000V AC or below.\n- If a transformer steps down from HV to LV, place it in HV.\n\nFor each item extract: tag_ref, description, quantity (integer), unit (EA/m/set/lot), category, manufacturer (or null), part_model (or null), voltage_rating, notes.\n\nHV categories (use exactly): HV circuit breaker, HV switchgear, HV cable, HV busbar, HV fuse, HV isolator, HV surge arrester, Transformer, Generator, Earthing, Other\nLV categories (use exactly): Circuit breaker, Distribution board, MCC, Panel, LV switchgear, Cable, Conduit, Trunking, Motor, Drive, VFD, UPS, Relay, Contactor, Luminaire, Switch, Socket, Outlet, Sensor, Detector, Meter, Instrument, Earthing, Other\n\nReturn ONLY valid JSON, no markdown:\n{"project_title":"inferred name","hv_items":[{"item_no":"1","tag_ref":"T-01","description":"...","quantity":1,"unit":"EA","category":"Transformer","manufacturer":null,"part_model":null,"voltage_rating":"11kV/415V 1000kVA","notes":"..."}],"lv_items":[{"item_no":"1","tag_ref":"DB-A","description":"...","quantity":1,"unit":"EA","category":"Distribution board","manufacturer":null,"part_model":null,"voltage_rating":"415V 800A","notes":"..."}],"summary":"1-2 sentence summary"}`});
   setSt('AI is reading your electrical diagram…');
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:4000,messages:[{role:'user',content}]})});
+    const res=await fetch(API_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:8000,messages:[{role:'user',content}]})});
     const data=await res.json();
     if(data.error)throw new Error(data.error.message);
     const raw=data.content.map(c=>c.text||'').join('');
