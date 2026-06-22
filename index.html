@@ -7,7 +7,8 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1a1a1a;background:#f5f5f3;min-height:100vh;padding:2rem 1rem}
-.container{max-width:1100px;margin:0 auto}
+.outer{display:grid;grid-template-columns:1fr 320px;gap:16px;max-width:1400px;margin:0 auto;align-items:start}
+.main{}
 header{margin-bottom:2rem}
 header h1{font-size:22px;font-weight:500;margin-bottom:4px}
 header p{font-size:14px;color:#666}
@@ -74,110 +75,145 @@ td.edit:focus{outline:none;background:#EEF5FD}
 input[type=file]{display:none}
 .col-no{width:36px}.col-ref{width:72px}.col-desc{width:160px}.col-qty{width:42px}.col-unit{width:38px}.col-cat{width:100px}.col-mfr{width:90px}.col-part{width:90px}.col-vr{width:100px}.col-notes{width:130px}
 .footer{text-align:center;margin-top:2rem;font-size:11px;color:#aaa}
+/* Chat panel */
+.chat-panel{border:0.5px solid #ddd;border-radius:12px;background:#fff;display:flex;flex-direction:column;height:600px;position:sticky;top:2rem}
+.chat-head{padding:12px 14px;border-bottom:0.5px solid #eee;background:#f9f9f7;border-radius:12px 12px 0 0}
+.chat-head-title{font-size:13px;font-weight:500}
+.chat-head-sub{font-size:11px;color:#888;margin-top:2px}
+.chat-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.msg{font-size:12px;line-height:1.5;padding:8px 10px;border-radius:8px;max-width:100%}
+.msg-user{background:#1a1a1a;color:#fff;align-self:flex-end;border-radius:8px 8px 2px 8px}
+.msg-ai{background:#f5f5f3;color:#1a1a1a;align-self:flex-start;border-radius:8px 8px 8px 2px;border:0.5px solid #eee}
+.msg-hint{color:#aaa;font-size:11px;text-align:center;padding:4px 0}
+.chat-input-row{padding:10px;border-top:0.5px solid #eee;display:flex;gap:6px}
+.chat-input{flex:1;border:0.5px solid #ddd;border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit;resize:none;outline:none;height:60px}
+.chat-input:focus{border-color:#1a1a1a}
+.chat-send{background:#1a1a1a;color:#fff;border:none;border-radius:8px;padding:0 12px;cursor:pointer;font-size:12px;transition:opacity 0.15s;flex-shrink:0}
+.chat-send:hover{opacity:0.8}
+.chat-send:disabled{opacity:0.35;cursor:not-allowed}
+@media(max-width:900px){.outer{grid-template-columns:1fr}.chat-panel{height:400px;position:static}}
 @media(max-width:600px){.upload-row{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<div class="container">
-  <header>
-    <h1>Electrical BOM extractor</h1>
-    <p>Upload your line diagram — specification is optional but improves accuracy. BOM is split into high voltage and low voltage.</p>
-  </header>
-  <div class="upload-row">
-    <div class="panel">
-      <div class="panel-head">
-        <div class="step-num">1</div>
-        <div>
-          <div class="ph-title">Line diagram <span class="tag tag-req">required</span></div>
-          <div class="ph-sub">Single-line · wiring · schematic</div>
+<div class="outer">
+  <div class="main">
+    <header>
+      <h1>Electrical BOM extractor</h1>
+      <p>Upload your line diagram — specification is optional but improves accuracy. BOM is split into high voltage and low voltage.</p>
+    </header>
+    <div class="upload-row">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="step-num">1</div>
+          <div>
+            <div class="ph-title">Line diagram <span class="tag tag-req">required</span></div>
+            <div class="ph-sub">Single-line · wiring · schematic</div>
+          </div>
+        </div>
+        <div class="drop-zone" id="dz-d" onclick="document.getElementById('inp-d').click()">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          <div class="dz-label">Click or drag to upload</div>
+          <div class="dz-fmt">PNG · JPG · PDF</div>
+          <div id="d-pill"></div>
         </div>
       </div>
-      <div class="drop-zone" id="dz-d" onclick="document.getElementById('inp-d').click()">
-        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-        <div class="dz-label">Click or drag to upload</div>
-        <div class="dz-fmt">PNG · JPG · PDF</div>
-        <div id="d-pill"></div>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="panel-head">
-        <div class="step-num">2</div>
-        <div>
-          <div class="ph-title">Specification document <span class="tag tag-opt">optional</span></div>
-          <div class="ph-sub">Equipment schedule · data sheets</div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="step-num">2</div>
+          <div>
+            <div class="ph-title">Specification document <span class="tag tag-opt">optional</span></div>
+            <div class="ph-sub">Equipment schedule · data sheets</div>
+          </div>
+        </div>
+        <div class="drop-zone" id="dz-s" onclick="document.getElementById('inp-s').click()">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <div class="dz-label">Click or drag to upload</div>
+          <div class="dz-fmt">PDF · TXT</div>
+          <div id="s-pill"></div>
         </div>
       </div>
-      <div class="drop-zone" id="dz-s" onclick="document.getElementById('inp-s').click()">
-        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-        <div class="dz-label">Click or drag to upload</div>
-        <div class="dz-fmt">PDF · TXT</div>
-        <div id="s-pill"></div>
+    </div>
+    <input type="file" id="inp-d" accept="image/*,.pdf">
+    <input type="file" id="inp-s" accept=".pdf,.txt,application/pdf,text/plain">
+    <button class="btn-primary" id="btn-ex" disabled onclick="extract()">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></svg>
+      Extract bill of materials
+    </button>
+    <div id="status-area"></div>
+    <div class="bom-section">
+      <div class="section-head hv-head">
+        <div class="section-head-left">
+          <div class="hv-icon"><svg width="14" height="14" fill="none" stroke="#712B13" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
+          <div><div class="hv-label">High voltage</div><div class="hv-sub">Above 1000V AC / 1500V DC</div></div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-sm" id="hv-csv" disabled onclick="dlCSV('hv')">&#8595; CSV</button>
+          <button class="btn-sm" id="hv-json" disabled onclick="dlJSON('hv')">{} JSON</button>
+        </div>
       </div>
+      <div id="hv-metrics" style="display:none" class="metrics-row">
+        <div class="metric"><div class="val" id="hv-m1">0</div><div class="lbl">Items</div></div>
+        <div class="metric"><div class="val" id="hv-m2">0</div><div class="lbl">Total units</div></div>
+        <div class="metric"><div class="val" id="hv-m3">0</div><div class="lbl">Categories</div></div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th class="col-no">#</th><th class="col-ref">Tag / ref</th><th class="col-desc">Description</th>
+          <th class="col-qty">Qty</th><th class="col-unit">Unit</th><th class="col-cat">Category</th>
+          <th class="col-mfr">Manufacturer</th><th class="col-part">Part / model</th>
+          <th class="col-vr">Voltage / rating</th><th class="col-notes">Notes</th>
+        </tr></thead>
+        <tbody id="hv-body"><tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>High voltage items will appear here</div></td></tr></tbody>
+      </table></div>
+    </div>
+    <div class="bom-section">
+      <div class="section-head lv-head">
+        <div class="section-head-left">
+          <div class="lv-icon"><svg width="14" height="14" fill="none" stroke="#0C447C" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 0v4m0 14v-4M2 12h4m14 0h-4"/></svg></div>
+          <div><div class="lv-label">Low voltage</div><div class="lv-sub">Up to 1000V AC / 1500V DC</div></div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-sm" id="lv-csv" disabled onclick="dlCSV('lv')">&#8595; CSV</button>
+          <button class="btn-sm" id="lv-json" disabled onclick="dlJSON('lv')">{} JSON</button>
+        </div>
+      </div>
+      <div id="lv-metrics" style="display:none" class="metrics-row">
+        <div class="metric"><div class="val" id="lv-m1">0</div><div class="lbl">Items</div></div>
+        <div class="metric"><div class="val" id="lv-m2">0</div><div class="lbl">Total units</div></div>
+        <div class="metric"><div class="val" id="lv-m3">0</div><div class="lbl">Categories</div></div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th class="col-no">#</th><th class="col-ref">Tag / ref</th><th class="col-desc">Description</th>
+          <th class="col-qty">Qty</th><th class="col-unit">Unit</th><th class="col-cat">Category</th>
+          <th class="col-mfr">Manufacturer</th><th class="col-part">Part / model</th>
+          <th class="col-vr">Voltage / rating</th><th class="col-notes">Notes</th>
+        </tr></thead>
+        <tbody id="lv-body"><tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 0v4m0 14v-4M2 12h4m14 0h-4"/></svg>Low voltage items will appear here</div></td></tr></tbody>
+      </table></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:4px">
+      <button class="btn-sm" id="btn-clear" style="display:none" onclick="clearAll()">&#8635; Clear all</button>
+    </div>
+    <div class="footer">Powered by Claude</div>
+  </div>
+
+  <!-- Chat sidebar -->
+  <div class="chat-panel">
+    <div class="chat-head">
+      <div class="chat-head-title">BOM Assistant</div>
+      <div class="chat-head-sub">Edit your BOM with plain English</div>
+    </div>
+    <div class="chat-msgs" id="chat-msgs">
+      <div class="msg-hint">Extract a BOM first, then ask me to edit it.</div>
+      <div class="msg msg-ai">Try: "Remove all cables", "Change quantity of T-01 to 3", "Add a 415V distribution board", "Show me all transformers"</div>
+    </div>
+    <div class="chat-input-row">
+      <textarea class="chat-input" id="chat-input" placeholder="e.g. Remove all cables…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+      <button class="chat-send" id="chat-send" onclick="sendChat()">Send</button>
     </div>
   </div>
-  <input type="file" id="inp-d" accept="image/*,.pdf">
-  <input type="file" id="inp-s" accept=".pdf,.txt,application/pdf,text/plain">
-  <button class="btn-primary" id="btn-ex" disabled onclick="extract()">
-    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 3l14 9-14 9V3z"/></svg>
-    Extract bill of materials
-  </button>
-  <div id="status-area"></div>
-  <div class="bom-section">
-    <div class="section-head hv-head">
-      <div class="section-head-left">
-        <div class="hv-icon"><svg width="14" height="14" fill="none" stroke="#712B13" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
-        <div><div class="hv-label">High voltage</div><div class="hv-sub">Above 1000V AC / 1500V DC</div></div>
-      </div>
-      <div style="display:flex;gap:6px">
-        <button class="btn-sm" id="hv-csv" disabled onclick="dlCSV('hv')">&#8595; CSV</button>
-        <button class="btn-sm" id="hv-json" disabled onclick="dlJSON('hv')">{} JSON</button>
-      </div>
-    </div>
-    <div id="hv-metrics" style="display:none" class="metrics-row">
-      <div class="metric"><div class="val" id="hv-m1">0</div><div class="lbl">Items</div></div>
-      <div class="metric"><div class="val" id="hv-m2">0</div><div class="lbl">Total units</div></div>
-      <div class="metric"><div class="val" id="hv-m3">0</div><div class="lbl">Categories</div></div>
-    </div>
-    <div class="table-wrap"><table>
-      <thead><tr>
-        <th class="col-no">#</th><th class="col-ref">Tag / ref</th><th class="col-desc">Description</th>
-        <th class="col-qty">Qty</th><th class="col-unit">Unit</th><th class="col-cat">Category</th>
-        <th class="col-mfr">Manufacturer</th><th class="col-part">Part / model</th>
-        <th class="col-vr">Voltage / rating</th><th class="col-notes">Notes</th>
-      </tr></thead>
-      <tbody id="hv-body"><tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>High voltage items will appear here</div></td></tr></tbody>
-    </table></div>
-  </div>
-  <div class="bom-section">
-    <div class="section-head lv-head">
-      <div class="section-head-left">
-        <div class="lv-icon"><svg width="14" height="14" fill="none" stroke="#0C447C" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 0v4m0 14v-4M2 12h4m14 0h-4"/></svg></div>
-        <div><div class="lv-label">Low voltage</div><div class="lv-sub">Up to 1000V AC / 1500V DC</div></div>
-      </div>
-      <div style="display:flex;gap:6px">
-        <button class="btn-sm" id="lv-csv" disabled onclick="dlCSV('lv')">&#8595; CSV</button>
-        <button class="btn-sm" id="lv-json" disabled onclick="dlJSON('lv')">{} JSON</button>
-      </div>
-    </div>
-    <div id="lv-metrics" style="display:none" class="metrics-row">
-      <div class="metric"><div class="val" id="lv-m1">0</div><div class="lbl">Items</div></div>
-      <div class="metric"><div class="val" id="lv-m2">0</div><div class="lbl">Total units</div></div>
-      <div class="metric"><div class="val" id="lv-m3">0</div><div class="lbl">Categories</div></div>
-    </div>
-    <div class="table-wrap"><table>
-      <thead><tr>
-        <th class="col-no">#</th><th class="col-ref">Tag / ref</th><th class="col-desc">Description</th>
-        <th class="col-qty">Qty</th><th class="col-unit">Unit</th><th class="col-cat">Category</th>
-        <th class="col-mfr">Manufacturer</th><th class="col-part">Part / model</th>
-        <th class="col-vr">Voltage / rating</th><th class="col-notes">Notes</th>
-      </tr></thead>
-      <tbody id="lv-body"><tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 0v4m0 14v-4M2 12h4m14 0h-4"/></svg>Low voltage items will appear here</div></td></tr></tbody>
-    </table></div>
-  </div>
-  <div style="display:flex;justify-content:flex-end;margin-top:4px">
-    <button class="btn-sm" id="btn-clear" style="display:none" onclick="clearAll()">&#8635; Clear all</button>
-  </div>
-  <div class="footer">Powered by Claude · Edit the API_KEY constant in this file to update your key</div>
 </div>
 <script>
 const API_ENDPOINT = '/api/extract';
@@ -218,6 +254,7 @@ async function extract(){
     ['hv-csv','hv-json','lv-csv','lv-json'].forEach(id=>document.getElementById(id).disabled=false);
     document.getElementById('btn-clear').style.display='';
     document.getElementById('btn-ex').disabled=false;
+    addChatMsg('ai','BOM extracted! You can now ask me to edit it.');
   }catch(e){setErr('Extraction failed: '+e.message);document.getElementById('btn-ex').disabled=false;}
 }
 function renderSection(type,items){
@@ -234,6 +271,58 @@ function getTableData(type){return[...document.querySelectorAll(`#${type}-body t
 function dlCSV(type){const data=getTableData(type);const h=['Item no','Tag/ref','Description','Quantity','Unit','Category','Manufacturer','Part/model','Voltage/rating','Notes'];const rows=data.map(it=>[it.item_no,it.tag_ref,it.description,it.quantity,it.unit,it.category,it.manufacturer,it.part_model,it.voltage_rating,it.notes].map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(','));const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[h.join(','),...rows].join('\n')],{type:'text/csv'}));a.download=`${type}-bom.csv`;a.click();}
 function dlJSON(type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(getTableData(type),null,2)],{type:'application/json'}));a.download=`${type}-bom.json`;a.click();}
 function clearAll(){dFile=null;sFile=null;hvData=[];lvData=[];['d-pill','s-pill'].forEach(id=>document.getElementById(id).innerHTML='');['inp-d','inp-s'].forEach(id=>document.getElementById(id).value='');document.getElementById('status-area').innerHTML='';['hv','lv'].forEach(t=>{document.getElementById(`${t}-metrics`).style.display='none';document.getElementById(`${t}-body`).innerHTML=`<tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>${t==='hv'?'High':'Low'} voltage items will appear here</div></td></tr>`;});document.getElementById('btn-ex').disabled=true;['hv-csv','hv-json','lv-csv','lv-json'].forEach(id=>document.getElementById(id).disabled=true);document.getElementById('btn-clear').style.display='none';}
+
+/* Chat */
+function addChatMsg(role,text){
+  const msgs=document.getElementById('chat-msgs');
+  const div=document.createElement('div');
+  div.className=`msg msg-${role}`;
+  div.textContent=text;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+}
+async function sendChat(){
+  const input=document.getElementById('chat-input');
+  const msg=input.value.trim();
+  if(!msg)return;
+  if(!hvData.length&&!lvData.length){addChatMsg('ai','Please extract a BOM first before asking me to edit it.');return;}
+  input.value='';
+  addChatMsg('user',msg);
+  document.getElementById('chat-send').disabled=true;
+  const thinking=document.createElement('div');
+  thinking.className='msg msg-ai';
+  thinking.textContent='Thinking…';
+  document.getElementById('chat-msgs').appendChild(thinking);
+  document.getElementById('chat-msgs').scrollTop=document.getElementById('chat-msgs').scrollHeight;
+  const prompt=`You are an assistant that edits an electrical Bill of Materials based on user instructions.
+
+Current BOM:
+HV items: ${JSON.stringify(hvData)}
+LV items: ${JSON.stringify(lvData)}
+
+User instruction: "${msg}"
+
+Apply the instruction and return the updated BOM as valid JSON only, no markdown:
+{"hv_items":[...],"lv_items":[...],"reply":"one sentence describing what you changed"}
+
+Rules:
+- Keep all original fields on each item (item_no, tag_ref, description, quantity, unit, category, manufacturer, part_model, voltage_rating, notes)
+- Re-number item_no sequentially after removals
+- If instruction is a question (e.g. "how many cables?"), do not change the BOM, just answer in the reply field and return the same hv_items/lv_items unchanged`;
+  try{
+    const res=await fetch(API_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:8000,messages:[{role:'user',content:[{type:'text',text:prompt}]}]})});
+    const data=await res.json();
+    if(data.error)throw new Error(data.error.message);
+    const raw=data.content.map(c=>c.text||'').join('');
+    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    hvData=parsed.hv_items||hvData;
+    lvData=parsed.lv_items||lvData;
+    renderSection('hv',hvData);
+    renderSection('lv',lvData);
+    thinking.textContent=parsed.reply||'Done.';
+  }catch(e){thinking.textContent='Error: '+e.message;}
+  document.getElementById('chat-send').disabled=false;
+}
 </script>
 </body>
 </html>
