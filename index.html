@@ -202,8 +202,13 @@ input[type=file]{display:none}
   <!-- Chat sidebar -->
   <div class="chat-panel">
     <div class="chat-head">
-      <div class="chat-head-title">BOM Assistant</div>
-      <div class="chat-head-sub">Edit your BOM with plain English</div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div class="chat-head-title">BOM Assistant</div>
+          <div class="chat-head-sub">Edit your BOM with plain English</div>
+        </div>
+        <button class="btn-sm" onclick="showRules()" id="rules-btn" title="Learned rules">&#128196; Rules (<span id="rules-count">0</span>)</button>
+      </div>
     </div>
     <div class="chat-msgs" id="chat-msgs">
       <div class="msg-hint">Extract a BOM first, then ask me to edit it.</div>
@@ -219,6 +224,10 @@ input[type=file]{display:none}
 const API_ENDPOINT = '/api/extract';
 
 let dFile=null,sFile=null,hvData=[],lvData=[];
+let learnedRules=JSON.parse(localStorage.getItem('bom-rules')||'[]');
+function saveRules(){localStorage.setItem('bom-rules',JSON.stringify(learnedRules));document.getElementById('rules-count').textContent=learnedRules.length;}
+function showRules(){if(!learnedRules.length){alert('No learned rules yet. Make corrections via chat and they will be saved here.');return;}const msg=learnedRules.map((r,i)=>`${i+1}. ${r}`).join('\n');const del=prompt(`Learned rules (these apply to every future extraction):\n\n${msg}\n\nType a rule number to delete it, or cancel to close:`);if(del&&!isNaN(del)){const idx=parseInt(del)-1;if(idx>=0&&idx<learnedRules.length){learnedRules.splice(idx,1);saveRules();alert('Rule deleted.');}}}
+saveRules();
 const catBadge=c=>{const m={'Transformer':'b-coral','HV switchgear':'b-coral','HV circuit breaker':'b-coral','HV cable':'b-coral','HV busbar':'b-coral','HV fuse':'b-coral','HV isolator':'b-coral','HV surge arrester':'b-coral','Generator':'b-purple','Earthing':'b-gray','Circuit breaker':'b-blue','Distribution board':'b-blue','MCC':'b-blue','Panel':'b-blue','LV switchgear':'b-blue','Cable':'b-amber','Conduit':'b-amber','Trunking':'b-amber','Motor':'b-purple','Drive':'b-purple','VFD':'b-purple','UPS':'b-purple','Relay':'b-teal','Contactor':'b-teal','Luminaire':'b-green','Switch':'b-green','Socket':'b-green','Outlet':'b-green','Sensor':'b-green','Detector':'b-green','Meter':'b-teal','Instrument':'b-teal','Other':'b-gray'};return `<span class="badge ${m[c]||'b-gray'}">${c||'Other'}</span>`;};
 function toB64(f){return new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result.split(',')[1]);rd.onerror=j;rd.readAsDataURL(f);})}
 function setFile(t,f){if(t==='d'){dFile=f;document.getElementById('d-pill').innerHTML=`<span class="file-pill">&#10003; ${f.name.slice(0,20)}${f.name.length>20?'…':''}</span>`;}else{sFile=f;document.getElementById('s-pill').innerHTML=`<span class="file-pill">&#10003; ${f.name.slice(0,20)}${f.name.length>20?'…':''}</span>`;}document.getElementById('btn-ex').disabled=!dFile;}
@@ -239,7 +248,8 @@ async function extract(){
   const content=[];
   if(dFile){const b=await toB64(dFile);content.push(dFile.type.startsWith('image/')?{type:'image',source:{type:'base64',media_type:dFile.type,data:b}}:{type:'document',source:{type:'base64',media_type:'application/pdf',data:b}});}
   if(sFile){if(sFile.type==='text/plain'){const t=await sFile.text();content.push({type:'text',text:`SPECIFICATION:\n${t}`});}else{const b=await toB64(sFile);content.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:b}});}}
-  content.push({type:'text',text:`You are a senior electrical engineer. Analyse the provided electrical diagram(s)${sFile?' and specification document':''}and produce a complete Bill of Materials separated into HIGH VOLTAGE and LOW VOLTAGE sections.\n\nCLASSIFICATION RULES:\n- High voltage (HV): equipment rated above 1000V AC or 1500V DC.\n- Low voltage (LV): equipment rated at 1000V AC or below.\n- If a transformer steps down from HV to LV, place it in HV.\n\nFor each item extract: tag_ref, description, quantity (integer), unit (EA/m/set/lot), category, manufacturer (or null), part_model (or null), voltage_rating, notes.\n\nHV categories (use exactly): HV circuit breaker, HV switchgear, HV cable, HV busbar, HV fuse, HV isolator, HV surge arrester, Transformer, Generator, Earthing, Other\nLV categories (use exactly): Circuit breaker, Distribution board, MCC, Panel, LV switchgear, Cable, Conduit, Trunking, Motor, Drive, VFD, UPS, Relay, Contactor, Luminaire, Switch, Socket, Outlet, Sensor, Detector, Meter, Instrument, Earthing, Other\n\nReturn ONLY valid JSON, no markdown:\n{"project_title":"inferred name","hv_items":[{"item_no":"1","tag_ref":"T-01","description":"...","quantity":1,"unit":"EA","category":"Transformer","manufacturer":null,"part_model":null,"voltage_rating":"11kV/415V 1000kVA","notes":"..."}],"lv_items":[{"item_no":"1","tag_ref":"DB-A","description":"...","quantity":1,"unit":"EA","category":"Distribution board","manufacturer":null,"part_model":null,"voltage_rating":"415V 800A","notes":"..."}],"summary":"1-2 sentence summary"}`});
+  const rulesBlock=learnedRules.length?`\n\nUSER-DEFINED RULES (always follow these):\n${learnedRules.map((r,i)=>`${i+1}. ${r}`).join('\n')}`:'';
+  content.push({type:'text',text:`You are a senior electrical engineer. Analyse the provided electrical diagram(s)${sFile?' and specification document':''}and produce a complete Bill of Materials separated into HIGH VOLTAGE and LOW VOLTAGE sections.\n\nCLASSIFICATION RULES:\n- High voltage (HV): equipment rated above 1000V AC or 1500V DC.\n- Low voltage (LV): equipment rated at 1000V AC or below.\n- If a transformer steps down from HV to LV, place it in HV.\n\nFor each item extract: tag_ref, description, quantity (integer), unit (EA/m/set/lot), category, manufacturer (or null), part_model (or null), voltage_rating, notes.\n\nHV categories (use exactly): HV circuit breaker, HV switchgear, HV cable, HV busbar, HV fuse, HV isolator, HV surge arrester, Transformer, Generator, Earthing, Other\nLV categories (use exactly): Circuit breaker, Distribution board, MCC, Panel, LV switchgear, Cable, Conduit, Trunking, Motor, Drive, VFD, UPS, Relay, Contactor, Luminaire, Switch, Socket, Outlet, Sensor, Detector, Meter, Instrument, Earthing, Other${rulesBlock}\n\nReturn ONLY valid JSON, no markdown:\n{"project_title":"inferred name","hv_items":[{"item_no":"1","tag_ref":"T-01","description":"...","quantity":1,"unit":"EA","category":"Transformer","manufacturer":null,"part_model":null,"voltage_rating":"11kV/415V 1000kVA","notes":"..."}],"lv_items":[{"item_no":"1","tag_ref":"DB-A","description":"...","quantity":1,"unit":"EA","category":"Distribution board","manufacturer":null,"part_model":null,"voltage_rating":"415V 800A","notes":"..."}],"summary":"1-2 sentence summary"}`});
   setSt('AI is reading your electrical diagram…');
   try{
     const res=await fetch(API_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:16000,messages:[{role:'user',content}]})});
@@ -303,7 +313,7 @@ LV items: ${JSON.stringify(lvData)}
 User instruction: "${msg}"
 
 Apply the instruction and return the updated BOM as valid JSON only, no markdown:
-{"hv_items":[...],"lv_items":[...],"reply":"one sentence describing what you changed"}
+{"hv_items":[...],"lv_items":[...],"reply":"one sentence describing what you changed","learned_rule":"if this instruction reveals a general rule to remember for future extractions, write it as a short rule e.g. 'Cables should use unit m not EA'. If it is just a one-off edit or a question, return null"}
 
 Rules:
 - Keep all original fields on each item (item_no, tag_ref, description, quantity, unit, category, manufacturer, part_model, voltage_rating, notes)
@@ -319,7 +329,7 @@ Rules:
     lvData=parsed.lv_items||lvData;
     renderSection('hv',hvData);
     renderSection('lv',lvData);
-    thinking.textContent=parsed.reply||'Done.';
+    if(parsed.learned_rule){learnedRules.push(parsed.learned_rule);saveRules();thinking.textContent=(parsed.reply||'Done.')+' ✓ Rule saved: "'+parsed.learned_rule+'"';}else{thinking.textContent=parsed.reply||'Done.';}
   }catch(e){thinking.textContent='Error: '+e.message;}
   document.getElementById('chat-send').disabled=false;
 }
