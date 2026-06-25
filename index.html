@@ -7,8 +7,23 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1a1a1a;background:#f5f5f3;min-height:100vh;padding:2rem 1rem}
-.outer{display:grid;grid-template-columns:1fr 320px;gap:16px;max-width:1400px;margin:0 auto;align-items:start}
+.outer{display:grid;grid-template-columns:240px 1fr 320px;gap:16px;max-width:1600px;margin:0 auto;align-items:start}
 .main{}
+/* History sidebar */
+.history-panel{border:0.5px solid #ddd;border-radius:12px;background:#fff;display:flex;flex-direction:column;position:sticky;top:2rem;max-height:90vh}
+.history-head{padding:12px 14px;border-bottom:0.5px solid #eee;background:#f9f9f7;border-radius:12px 12px 0 0;display:flex;align-items:center;justify-content:space-between}
+.history-head-title{font-size:13px;font-weight:500}
+.history-list{flex:1;overflow-y:auto;padding:8px}
+.history-item{padding:9px 10px;border-radius:8px;cursor:pointer;margin-bottom:4px;border:0.5px solid transparent;transition:all 0.12s}
+.history-item:hover{background:#f5f5f3;border-color:#eee}
+.history-item.active{background:#EEF5FD;border-color:#C5DCFA}
+.history-item-title{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.history-item-meta{font-size:10px;color:#aaa;margin-top:2px}
+.history-empty{padding:24px 12px;text-align:center;color:#bbb;font-size:11px}
+.history-new{margin:8px;display:flex;align-items:center;gap:6px;background:#1a1a1a;color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;width:calc(100% - 16px);justify-content:center;transition:opacity 0.15s}
+.history-new:hover{opacity:0.8}
+@media(max-width:1000px){.outer{grid-template-columns:1fr 320px}.history-panel{display:none}}
+@media(max-width:600px){.outer{grid-template-columns:1fr}.history-panel{display:none}}
 header{margin-bottom:2rem}
 header h1{font-size:22px;font-weight:500;margin-bottom:4px}
 header p{font-size:14px;color:#666}
@@ -97,6 +112,17 @@ input[type=file]{display:none}
 </head>
 <body>
 <div class="outer">
+  <!-- History sidebar -->
+  <div class="history-panel">
+    <div class="history-head">
+      <div class="history-head-title">BOM History</div>
+      <span id="history-count" style="font-size:10px;color:#aaa"></span>
+    </div>
+    <div class="history-list" id="history-list">
+      <div class="history-empty">No past BOMs yet.<br>Extract one to save it here.</div>
+    </div>
+    <button class="history-new" onclick="newBOM()">+ New BOM</button>
+  </div>
   <div class="main">
     <header>
       <h1>Electrical BOM extractor</h1>
@@ -253,6 +279,63 @@ const API_ENDPOINT = '/api/extract';
 
 let dFile=null,sFile=null,hvData=[],lvData=[];
 let learnedRules=JSON.parse(localStorage.getItem('bom-rules')||'[]');
+let bomHistory=JSON.parse(localStorage.getItem('bom-history')||'[]');
+let activeHistoryId=null;
+function saveHistory(title){
+  const id=Date.now().toString();
+  const entry={id,title:title||'Untitled BOM',date:new Date().toLocaleDateString('en-CA'),hvData:JSON.parse(JSON.stringify(hvData)),lvData:JSON.parse(JSON.stringify(lvData))};
+  bomHistory.unshift(entry);
+  if(bomHistory.length>50)bomHistory=bomHistory.slice(0,50);
+  localStorage.setItem('bom-history',JSON.stringify(bomHistory));
+  activeHistoryId=id;
+  renderHistory();
+}
+function updateActiveHistory(){
+  if(!activeHistoryId)return;
+  const entry=bomHistory.find(e=>e.id===activeHistoryId);
+  if(!entry)return;
+  entry.hvData=JSON.parse(JSON.stringify(hvData));
+  entry.lvData=JSON.parse(JSON.stringify(lvData));
+  localStorage.setItem('bom-history',JSON.stringify(bomHistory));
+}
+function loadHistory(id){
+  const entry=bomHistory.find(e=>e.id===id);
+  if(!entry)return;
+  hvData=JSON.parse(JSON.stringify(entry.hvData));
+  lvData=JSON.parse(JSON.stringify(entry.lvData));
+  activeHistoryId=id;
+  renderHistory();
+  renderSection('hv',hvData);renderSection('lv',lvData);
+  document.getElementById('hv-metrics').style.display='grid';
+  document.getElementById('lv-metrics').style.display='grid';
+  ['hv-csv','hv-json','lv-csv','lv-json'].forEach(i=>document.getElementById(i).disabled=false);
+  document.getElementById('btn-clear').style.display='';
+  document.getElementById('btn-quote').style.display='';
+  document.getElementById('status-area').innerHTML='';
+  addChatMsg('ai',`Loaded: ${entry.title}`);
+}
+function deleteHistory(id,e){
+  e.stopPropagation();
+  bomHistory=bomHistory.filter(e=>e.id!==id);
+  localStorage.setItem('bom-history',JSON.stringify(bomHistory));
+  if(activeHistoryId===id){activeHistoryId=null;}
+  renderHistory();
+}
+function renderHistory(){
+  const list=document.getElementById('history-list');
+  document.getElementById('history-count').textContent=bomHistory.length?`${bomHistory.length} saved`:'';
+  if(!bomHistory.length){list.innerHTML='<div class="history-empty">No past BOMs yet.<br>Extract one to save it here.</div>';return;}
+  list.innerHTML=bomHistory.map(e=>`
+    <div class="history-item${e.id===activeHistoryId?' active':''}" onclick="loadHistory('${e.id}')">
+      <div style="display:flex;align-items:start;justify-content:space-between;gap:4px">
+        <div class="history-item-title">${e.title}</div>
+        <button onclick="deleteHistory('${e.id}',event)" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:14px;flex-shrink:0;line-height:1" title="Delete">&times;</button>
+      </div>
+      <div class="history-item-meta">${e.date} &nbsp;·&nbsp; ${(e.hvData||[]).length+(e.lvData||[]).length} items</div>
+    </div>`).join('');
+}
+function newBOM(){clearAll();activeHistoryId=null;renderHistory();}
+renderHistory();
 function saveRules(){localStorage.setItem('bom-rules',JSON.stringify(learnedRules));document.getElementById('rules-count').textContent=learnedRules.length;}
 function showRules(){if(!learnedRules.length){alert('No learned rules yet. Make corrections via chat and they will be saved here.');return;}const msg=learnedRules.map((r,i)=>`${i+1}. ${r}`).join('\n');const del=prompt(`Learned rules (these apply to every future extraction):\n\n${msg}\n\nType a rule number to delete it, or cancel to close:`);if(del&&!isNaN(del)){const idx=parseInt(del)-1;if(idx>=0&&idx<learnedRules.length){learnedRules.splice(idx,1);saveRules();alert('Rule deleted.');}}}
 saveRules();
@@ -301,6 +384,7 @@ async function extract(){
     document.getElementById('btn-clear').style.display='';
     document.getElementById('btn-quote').style.display='';
     document.getElementById('btn-ex').disabled=false;
+    saveHistory(parsed.project_title||'Untitled BOM');
     addChatMsg('ai','BOM extracted! You can now ask me to edit it.');
   }catch(e){setErr('Extraction failed: '+e.message);document.getElementById('btn-ex').disabled=false;}
 }
@@ -414,6 +498,7 @@ Rules:
     lvData=parsed.lv_items||lvData;
     renderSection('hv',hvData);
     renderSection('lv',lvData);
+    updateActiveHistory();
     if(parsed.learned_rule){learnedRules.push(parsed.learned_rule);saveRules();thinking.textContent=(parsed.reply||'Done.')+' ✓ Rule saved: "'+parsed.learned_rule+'"';}else{thinking.textContent=parsed.reply||'Done.';}
   }catch(e){thinking.textContent='Error: '+e.message;}
   document.getElementById('chat-send').disabled=false;
