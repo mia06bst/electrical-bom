@@ -193,8 +193,31 @@ input[type=file]{display:none}
         <tbody id="lv-body"><tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 0v4m0 14v-4M2 12h4m14 0h-4"/></svg>Low voltage items will appear here</div></td></tr></tbody>
       </table></div>
     </div>
-    <div style="display:flex;justify-content:flex-end;margin-top:4px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+      <button class="btn-primary" id="btn-quote" style="display:none;width:auto;padding:10px 24px;background:#1a6b3a" onclick="showQuoteModal()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+        Generate Quotation
+      </button>
       <button class="btn-sm" id="btn-clear" style="display:none" onclick="clearAll()">&#8635; Clear all</button>
+    </div>
+
+    <!-- Quotation modal -->
+    <div id="quote-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;align-items:center;justify-content:center">
+      <div style="background:#fff;border-radius:14px;padding:28px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto">
+        <div style="font-size:16px;font-weight:500;margin-bottom:4px">Generate Quotation</div>
+        <div style="font-size:12px;color:#888;margin-bottom:20px">Fill in the quotation details — the BOM will be attached automatically.</div>
+        <div style="display:grid;gap:12px">
+          <label style="font-size:12px;font-weight:500">TO (Client name)<input id="q-to" type="text" placeholder="e.g. Accel" style="display:block;width:100%;margin-top:4px;border:0.5px solid #ddd;border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;outline:none"></label>
+          <label style="font-size:12px;font-weight:500">ATTENTION (Contact person)<input id="q-att" type="text" placeholder="e.g. Ryan Scanlon" style="display:block;width:100%;margin-top:4px;border:0.5px solid #ddd;border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;outline:none"></label>
+          <label style="font-size:12px;font-weight:500">ACTQ # (Quote number)<input id="q-actq" type="text" placeholder="e.g. 260101001" style="display:block;width:100%;margin-top:4px;border:0.5px solid #ddd;border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;outline:none"></label>
+          <label style="font-size:12px;font-weight:500">RE (Project description)<input id="q-re" type="text" placeholder="e.g. Electrical Installation – 123 Main St" style="display:block;width:100%;margin-top:4px;border:0.5px solid #ddd;border-radius:6px;padding:8px 10px;font-size:13px;font-family:inherit;outline:none"></label>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px">
+          <button class="btn-primary" id="btn-dl-quote" onclick="generateQuotation()" style="flex:1">Download .docx</button>
+          <button class="btn-sm" onclick="document.getElementById('quote-modal').style.display='none'" style="padding:10px 16px">Cancel</button>
+        </div>
+        <div id="quote-status" style="margin-top:10px;font-size:12px;color:#888;text-align:center"></div>
+      </div>
     </div>
     <div class="footer">Powered by Claude</div>
   </div>
@@ -268,6 +291,7 @@ async function extract(){
     renderSection('hv',hvData);renderSection('lv',lvData);
     ['hv-csv','hv-json','lv-csv','lv-json'].forEach(id=>document.getElementById(id).disabled=false);
     document.getElementById('btn-clear').style.display='';
+    document.getElementById('btn-quote').style.display='';
     document.getElementById('btn-ex').disabled=false;
     addChatMsg('ai','BOM extracted! You can now ask me to edit it.');
   }catch(e){setErr('Extraction failed: '+e.message);document.getElementById('btn-ex').disabled=false;}
@@ -285,7 +309,28 @@ function renderSection(type,items){
 function getTableData(type){return[...document.querySelectorAll(`#${type}-body tr`)].map(tr=>{const c=tr.querySelectorAll('td');if(c.length<10)return null;return{item_no:c[0].textContent.trim(),tag_ref:c[1].textContent.trim(),description:c[2].textContent.trim(),quantity:c[3].textContent.trim(),unit:c[4].textContent.trim(),category:c[5].textContent.trim(),manufacturer:c[6].textContent.trim(),part_model:c[7].textContent.trim(),voltage_rating:c[8].textContent.trim(),notes:c[9].textContent.trim()};}).filter(Boolean);}
 function dlCSV(type){const data=getTableData(type);const h=['Item no','Tag/ref','Description','Quantity','Unit','Category','Manufacturer','Part/model','Voltage/rating','Notes'];const rows=data.map(it=>[it.item_no,it.tag_ref,it.description,it.quantity,it.unit,it.category,it.manufacturer,it.part_model,it.voltage_rating,it.notes].map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(','));const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[h.join(','),...rows].join('\n')],{type:'text/csv'}));a.download=`${type}-bom.csv`;a.click();}
 function dlJSON(type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(getTableData(type),null,2)],{type:'application/json'}));a.download=`${type}-bom.json`;a.click();}
-function clearAll(){dFile=null;sFile=null;hvData=[];lvData=[];['d-pill','s-pill'].forEach(id=>document.getElementById(id).innerHTML='');['inp-d','inp-s'].forEach(id=>document.getElementById(id).value='');document.getElementById('status-area').innerHTML='';['hv','lv'].forEach(t=>{document.getElementById(`${t}-metrics`).style.display='none';document.getElementById(`${t}-body`).innerHTML=`<tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>${t==='hv'?'High':'Low'} voltage items will appear here</div></td></tr>`;});document.getElementById('btn-ex').disabled=true;['hv-csv','hv-json','lv-csv','lv-json'].forEach(id=>document.getElementById(id).disabled=true);document.getElementById('btn-clear').style.display='none';}
+function showQuoteModal(){document.getElementById('quote-modal').style.display='flex';}
+async function generateQuotation(){
+  const btn=document.getElementById('btn-dl-quote');
+  const status=document.getElementById('quote-status');
+  btn.disabled=true;btn.textContent='Generating…';status.textContent='';
+  try{
+    const res=await fetch('/api/quotation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      hvItems:hvData,lvItems:lvData,
+      meta:{to:document.getElementById('q-to').value,attention:document.getElementById('q-att').value,actqNo:document.getElementById('q-actq').value,re:document.getElementById('q-re').value}
+    })});
+    if(!res.ok)throw new Error(await res.text());
+    const blob=await res.blob();
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    const actq=document.getElementById('q-actq').value||'quotation';
+    a.download=`${actq}-quotation.docx`;
+    a.click();
+    document.getElementById('quote-modal').style.display='none';
+  }catch(e){status.textContent='Error: '+e.message;}
+  btn.disabled=false;btn.textContent='Download .docx';
+}
+function clearAll(){dFile=null;sFile=null;hvData=[];lvData=[];['d-pill','s-pill'].forEach(id=>document.getElementById(id).innerHTML='');['inp-d','inp-s'].forEach(id=>document.getElementById(id).value='');document.getElementById('status-area').innerHTML='';['hv','lv'].forEach(t=>{document.getElementById(`${t}-metrics`).style.display='none';document.getElementById(`${t}-body`).innerHTML=`<tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>${t==='hv'?'High':'Low'} voltage items will appear here</div></td></tr>`;});document.getElementById('btn-ex').disabled=true;document.getElementById('btn-quote').style.display='none';['hv-csv','hv-json','lv-csv','lv-json'].forEach(id=>document.getElementById(id).disabled=true);document.getElementById('btn-clear').style.display='none';}
 
 /* Chat file attachment */
 let chatAttachment=null;
