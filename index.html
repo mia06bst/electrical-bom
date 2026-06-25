@@ -284,7 +284,15 @@ async function extract(){
     const data=await res.json();
     if(data.error)throw new Error(data.error.message);
     const raw=data.content.map(c=>c.text||'').join('');
-    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    let parsed;
+    try{parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());}
+    catch(e){
+      // Try to extract JSON object from response
+      const match=raw.match(/\{[\s\S]*\}/);
+      if(!match)throw new Error('Could not parse AI response as JSON. Try again.');
+      try{parsed=JSON.parse(match[0]);}
+      catch(e2){throw new Error('Malformed JSON from AI: '+e2.message+'. Try uploading again.');}
+    }
     hvData=parsed.hv_items||[];lvData=parsed.lv_items||[];
     setSt('');
     if(parsed.summary)document.getElementById('status-area').innerHTML=`<div style="font-size:11px;color:#888;margin-bottom:10px">${parsed.summary}</div>`;
@@ -399,7 +407,9 @@ Rules:
     const data=await res.json();
     if(data.error)throw new Error(data.error.message);
     const raw=data.content.map(c=>c.text||'').join('');
-    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
+    let parsed;
+    try{parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());}
+    catch(e){const match=raw.match(/\{[\s\S]*\}/);if(!match)throw new Error('Could not parse AI response.');try{parsed=JSON.parse(match[0]);}catch(e2){throw new Error('Malformed JSON: '+e2.message);}}
     hvData=parsed.hv_items||hvData;
     lvData=parsed.lv_items||lvData;
     renderSection('hv',hvData);
