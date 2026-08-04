@@ -90,6 +90,16 @@ td.edit:focus{outline:none;background:#EEF5FD}
 input[type=file]{display:none}
 .col-no{width:36px}.col-ref{width:72px}.col-desc{width:160px}.col-qty{width:42px}.col-unit{width:38px}.col-cat{width:100px}.col-mfr{width:90px}.col-part{width:90px}.col-vr{width:100px}.col-notes{width:130px}
 .footer{text-align:center;margin-top:2rem;font-size:11px;color:#aaa}
+.sel-wrap{position:relative}
+.sel-drop{display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#fff;border:0.5px solid #ddd;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.14);width:260px;max-height:320px;overflow-y:auto;z-index:50;padding:6px}
+.sel-drop.open{display:block}
+.sel-actions{display:flex;align-items:center;gap:6px;padding:4px 6px 8px;border-bottom:0.5px solid #eee;margin-bottom:4px}
+.sel-actions button{background:none;border:none;color:#0C6FE0;font-size:10px;cursor:pointer;padding:0}
+.sel-item{display:flex;align-items:center;gap:8px;padding:6px 6px;border-radius:6px;font-size:11px;cursor:pointer}
+.sel-item:hover{background:#f5f5f3}
+.sel-item input{flex-shrink:0}
+.sel-item-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sel-empty{padding:12px;text-align:center;color:#bbb;font-size:11px}
 /* Chat panel */
 .chat-panel{border:0.5px solid #ddd;border-radius:12px;background:#fff;display:flex;flex-direction:column;height:600px;position:sticky;top:2rem}
 .chat-head{padding:12px 14px;border-bottom:0.5px solid #eee;background:#f9f9f7;border-radius:12px 12px 0 0}
@@ -174,6 +184,10 @@ input[type=file]{display:none}
           <div><div class="hv-label">High voltage</div><div class="hv-sub">Above 1000V AC / 1500V DC</div></div>
         </div>
         <div style="display:flex;gap:6px">
+          <div class="sel-wrap">
+            <button class="btn-sm" id="hv-selbtn" disabled onclick="toggleSelDropdown('hv')">&#9776; Select</button>
+            <div class="sel-drop" id="hv-seldrop"></div>
+          </div>
           <button class="btn-sm" id="hv-csv" disabled onclick="dlCSV('hv')">&#8595; CSV</button>
           <button class="btn-sm" id="hv-json" disabled onclick="dlJSON('hv')">{} JSON</button>
         </div>
@@ -200,6 +214,10 @@ input[type=file]{display:none}
           <div><div class="lv-label">Low voltage</div><div class="lv-sub">Up to 1000V AC / 1500V DC</div></div>
         </div>
         <div style="display:flex;gap:6px">
+          <div class="sel-wrap">
+            <button class="btn-sm" id="lv-selbtn" disabled onclick="toggleSelDropdown('lv')">&#9776; Select</button>
+            <div class="sel-drop" id="lv-seldrop"></div>
+          </div>
           <button class="btn-sm" id="lv-csv" disabled onclick="dlCSV('lv')">&#8595; CSV</button>
           <button class="btn-sm" id="lv-json" disabled onclick="dlJSON('lv')">{} JSON</button>
         </div>
@@ -277,13 +295,13 @@ input[type=file]{display:none}
 <script>
 const API_ENDPOINT = '/api/extract';
 
-let dFile=null,sFile=null,hvData=[],lvData=[];
+let dFile=null,sFile=null,hvData=[],lvData=[],hvIncluded=[],lvIncluded=[];
 let learnedRules=JSON.parse(localStorage.getItem('bom-rules')||'[]');
 let bomHistory=JSON.parse(localStorage.getItem('bom-history')||'[]');
 let activeHistoryId=null;
 function saveHistory(title){
   const id=Date.now().toString();
-  const entry={id,title:title||'Untitled BOM',date:new Date().toLocaleDateString('en-CA'),hvData:JSON.parse(JSON.stringify(hvData)),lvData:JSON.parse(JSON.stringify(lvData))};
+  const entry={id,title:title||'Untitled BOM',date:new Date().toLocaleDateString('en-CA'),hvData:JSON.parse(JSON.stringify(hvData)),lvData:JSON.parse(JSON.stringify(lvData)),hvIncluded:JSON.parse(JSON.stringify(hvIncluded)),lvIncluded:JSON.parse(JSON.stringify(lvIncluded))};
   bomHistory.unshift(entry);
   if(bomHistory.length>50)bomHistory=bomHistory.slice(0,50);
   localStorage.setItem('bom-history',JSON.stringify(bomHistory));
@@ -296,6 +314,8 @@ function updateActiveHistory(){
   if(!entry)return;
   entry.hvData=JSON.parse(JSON.stringify(hvData));
   entry.lvData=JSON.parse(JSON.stringify(lvData));
+  entry.hvIncluded=JSON.parse(JSON.stringify(hvIncluded));
+  entry.lvIncluded=JSON.parse(JSON.stringify(lvIncluded));
   localStorage.setItem('bom-history',JSON.stringify(bomHistory));
 }
 function loadHistory(id){
@@ -303,9 +323,11 @@ function loadHistory(id){
   if(!entry)return;
   hvData=JSON.parse(JSON.stringify(entry.hvData));
   lvData=JSON.parse(JSON.stringify(entry.lvData));
+  hvIncluded=entry.hvIncluded?JSON.parse(JSON.stringify(entry.hvIncluded)):hvData.map(()=>true);
+  lvIncluded=entry.lvIncluded?JSON.parse(JSON.stringify(entry.lvIncluded)):lvData.map(()=>true);
   activeHistoryId=id;
   renderHistory();
-  renderSection('hv',hvData);renderSection('lv',lvData);
+  renderSection('hv');renderSection('lv');
   document.getElementById('hv-metrics').style.display='grid';
   document.getElementById('lv-metrics').style.display='grid';
   ['hv-csv','hv-json','lv-csv','lv-json'].forEach(i=>document.getElementById(i).disabled=false);
@@ -349,7 +371,8 @@ function setSt(msg){document.getElementById('status-area').innerHTML=msg?`<div c
 function setErr(msg){document.getElementById('status-area').innerHTML=`<div class="err-bar">&#9888; ${msg}</div>`;}
 async function extract(){
   document.getElementById('btn-ex').disabled=true;
-  ['hv-csv','hv-json','lv-csv','lv-json'].forEach(id=>document.getElementById(id).disabled=true);
+  ['hv-csv','hv-json','lv-csv','lv-json','hv-selbtn','lv-selbtn'].forEach(id=>document.getElementById(id).disabled=true);
+  document.querySelectorAll('.sel-drop').forEach(d=>d.classList.remove('open'));
   document.getElementById('btn-clear').style.display='none';
   document.getElementById('hv-metrics').style.display='none';
   document.getElementById('lv-metrics').style.display='none';
@@ -363,23 +386,36 @@ async function extract(){
   content.push({type:'text',text:`You are a senior electrical engineer. Analyse the provided electrical diagram(s)${sFile?' and specification document':''}and produce a complete Bill of Materials separated into HIGH VOLTAGE and LOW VOLTAGE sections.\n\nCLASSIFICATION RULES:\n- High voltage (HV): equipment rated above 1000V AC or 1500V DC.\n- Low voltage (LV): equipment rated at 1000V AC or below.\n- If a transformer steps down from HV to LV, place it in HV.\n\nFor each item extract: tag_ref, description, quantity (integer), unit (EA/m/set/lot), category, manufacturer (or null), part_model (or null), voltage_rating, notes.\n\nHV categories (use exactly): HV circuit breaker, HV switchgear, HV cable, HV busbar, HV fuse, HV isolator, HV surge arrester, Transformer, Generator, Earthing, Other\nLV categories (use exactly): Circuit breaker, Distribution board, MCC, Panel, LV switchgear, Cable, Conduit, Trunking, Motor, Drive, VFD, UPS, Relay, Contactor, Luminaire, Switch, Socket, Outlet, Sensor, Detector, Meter, Instrument, Earthing, Other${rulesBlock}\n\nReturn ONLY valid JSON, no markdown:\n{"project_title":"inferred name","hv_items":[{"item_no":"1","tag_ref":"T-01","description":"...","quantity":1,"unit":"EA","category":"Transformer","manufacturer":null,"part_model":null,"voltage_rating":"11kV/415V 1000kVA","notes":"..."}],"lv_items":[{"item_no":"1","tag_ref":"DB-A","description":"...","quantity":1,"unit":"EA","category":"Distribution board","manufacturer":null,"part_model":null,"voltage_rating":"415V 800A","notes":"..."}],"summary":"1-2 sentence summary"}`});
   setSt('AI is reading your electrical diagram…');
   try{
-    const res=await fetch(API_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:16000,messages:[{role:'user',content}]})});
+    const res=await fetch(API_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:32000,temperature:0,messages:[{role:'user',content}]})});
     const data=await res.json();
     if(data.error)throw new Error(data.error.message);
     const raw=data.content.map(c=>c.text||'').join('');
     let parsed;
-    try{parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());}
+    const cleanRaw=raw.replace(/```json|```/g,'').trim();
+    try{parsed=JSON.parse(cleanRaw);}
     catch(e){
-      // Try to extract JSON object from response
-      const match=raw.match(/\{[\s\S]*\}/);
-      if(!match)throw new Error('Could not parse AI response as JSON. Try again.');
-      try{parsed=JSON.parse(match[0]);}
-      catch(e2){throw new Error('Malformed JSON from AI: '+e2.message+'. Try uploading again.');}
+      // Find the JSON object start
+      const start=cleanRaw.indexOf('{');
+      if(start===-1)throw new Error('No JSON found in response. Try again.');
+      let json=cleanRaw.slice(start);
+      // If truncated mid-array, try to close it cleanly
+      try{parsed=JSON.parse(json);}
+      catch(e2){
+        // Try progressively trimming to last complete object in arrays
+        json=json.replace(/,\s*\{[^}]*$/,'').replace(/,\s*"[^"]*"\s*:\s*[^,}\]]*$/,'');
+        // Close any open arrays and objects
+        const opens=(json.match(/\[/g)||[]).length-(json.match(/\]/g)||[]).length;
+        const openBraces=(json.match(/\{/g)||[]).length-(json.match(/\}/g)||[]).length;
+        json+=']'.repeat(Math.max(0,opens))+'}'.repeat(Math.max(0,openBraces));
+        try{parsed=JSON.parse(json);}
+        catch(e3){throw new Error('Could not parse AI response even after repair. Try uploading again.');}
+      }
     }
     hvData=parsed.hv_items||[];lvData=parsed.lv_items||[];
+    hvIncluded=hvData.map(()=>true);lvIncluded=lvData.map(()=>true);
     setSt('');
     if(parsed.summary)document.getElementById('status-area').innerHTML=`<div style="font-size:11px;color:#888;margin-bottom:10px">${parsed.summary}</div>`;
-    renderSection('hv',hvData);renderSection('lv',lvData);
+    renderSection('hv');renderSection('lv');
     ['hv-csv','hv-json','lv-csv','lv-json'].forEach(id=>document.getElementById(id).disabled=false);
     document.getElementById('btn-clear').style.display='';
     document.getElementById('btn-quote').style.display='';
@@ -388,7 +424,10 @@ async function extract(){
     addChatMsg('ai','BOM extracted! You can now ask me to edit it.');
   }catch(e){setErr('Extraction failed: '+e.message);document.getElementById('btn-ex').disabled=false;}
 }
-function renderSection(type,items){
+function renderSection(type){
+  const data=type==='hv'?hvData:lvData;
+  const included=type==='hv'?hvIncluded:lvIncluded;
+  const items=data.filter((_,i)=>included[i]!==false);
   const totalQty=items.reduce((s,i)=>s+(parseInt(i.quantity)||1),0);
   const cats=new Set(items.map(i=>i.category).filter(Boolean));
   document.getElementById(`${type}-m1`).textContent=items.length;
@@ -396,8 +435,54 @@ function renderSection(type,items){
   document.getElementById(`${type}-m3`).textContent=cats.size;
   document.getElementById(`${type}-metrics`).style.display='grid';
   const label=type==='hv'?'High':'Low';
-  document.getElementById(`${type}-body`).innerHTML=items.length?items.map((it,i)=>`<tr><td class="col-no" style="color:#aaa">${it.item_no||i+1}</td><td class="col-ref"><code style="font-size:10px;font-family:monospace">${it.tag_ref||'—'}</code></td><td class="col-desc edit" contenteditable="true">${it.description||'—'}</td><td class="col-qty edit" contenteditable="true" style="font-weight:500">${it.quantity??'—'}</td><td class="col-unit" style="color:#888">${it.unit||'EA'}</td><td class="col-cat">${catBadge(it.category)}</td><td class="col-mfr edit" contenteditable="true">${it.manufacturer||'—'}</td><td class="col-part edit" contenteditable="true" style="font-family:monospace;font-size:10px">${it.part_model||'—'}</td><td class="col-vr" style="font-size:10px">${it.voltage_rating||'—'}</td><td class="col-notes" style="font-size:10px;color:#888">${it.notes||''}</td></tr>`).join(''):`<tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>No ${label.toLowerCase()} voltage items found</div></td></tr>`;
+  let bodyHtml;
+  if(items.length){
+    bodyHtml=items.map((it,i)=>`<tr><td class="col-no" style="color:#aaa">${it.item_no||i+1}</td><td class="col-ref"><code style="font-size:10px;font-family:monospace">${it.tag_ref||'—'}</code></td><td class="col-desc edit" contenteditable="true">${it.description||'—'}</td><td class="col-qty edit" contenteditable="true" style="font-weight:500">${it.quantity??'—'}</td><td class="col-unit" style="color:#888">${it.unit||'EA'}</td><td class="col-cat">${catBadge(it.category)}</td><td class="col-mfr edit" contenteditable="true">${it.manufacturer||'—'}</td><td class="col-part edit" contenteditable="true" style="font-family:monospace;font-size:10px">${it.part_model||'—'}</td><td class="col-vr" style="font-size:10px">${it.voltage_rating||'—'}</td><td class="col-notes" style="font-size:10px;color:#888">${it.notes||''}</td></tr>`).join('');
+  }else if(data.length){
+    bodyHtml=`<tr><td colspan="10"><div class="empty">All ${label.toLowerCase()} voltage items are hidden.<br>Click "Select" above to show them.</div></td></tr>`;
+  }else{
+    bodyHtml=`<tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>No ${label.toLowerCase()} voltage items found</div></td></tr>`;
+  }
+  document.getElementById(`${type}-body`).innerHTML=bodyHtml;
+  updateSelBtn(type);
 }
+function updateSelBtn(type){
+  const data=type==='hv'?hvData:lvData;
+  const included=type==='hv'?hvIncluded:lvIncluded;
+  const btn=document.getElementById(`${type}-selbtn`);
+  const on=data.filter((_,i)=>included[i]!==false).length;
+  btn.textContent=`☰ Select (${on}/${data.length})`;
+  btn.disabled=data.length===0;
+}
+function toggleSelDropdown(type){
+  const drop=document.getElementById(`${type}-seldrop`);
+  const isOpen=drop.classList.contains('open');
+  document.querySelectorAll('.sel-drop').forEach(d=>d.classList.remove('open'));
+  if(!isOpen){renderSelList(type);drop.classList.add('open');}
+}
+function renderSelList(type){
+  const data=type==='hv'?hvData:lvData;
+  const included=type==='hv'?hvIncluded:lvIncluded;
+  const drop=document.getElementById(`${type}-seldrop`);
+  if(!data.length){drop.innerHTML='<div class="sel-empty">No items yet</div>';return;}
+  drop.innerHTML=`<div class="sel-actions"><button onclick="selAll('${type}',true)">Select all</button><span style="color:#ddd">|</span><button onclick="selAll('${type}',false)">Deselect all</button></div>`+
+    data.map((it,i)=>`<label class="sel-item"><input type="checkbox" ${included[i]!==false?'checked':''} onchange="toggleItemIncluded('${type}',${i},this.checked)"><span class="sel-item-label">${it.tag_ref?it.tag_ref+' — ':''}${it.description||'Item '+(i+1)}</span></label>`).join('');
+}
+function toggleItemIncluded(type,idx,checked){
+  const included=type==='hv'?hvIncluded:lvIncluded;
+  included[idx]=checked;
+  renderSection(type);
+  updateActiveHistory();
+}
+function selAll(type,val){
+  if(type==='hv')hvIncluded=hvData.map(()=>val);else lvIncluded=lvData.map(()=>val);
+  renderSection(type);
+  renderSelList(type);
+  updateActiveHistory();
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.sel-wrap'))document.querySelectorAll('.sel-drop').forEach(d=>d.classList.remove('open'));
+});
 function getTableData(type){return[...document.querySelectorAll(`#${type}-body tr`)].map(tr=>{const c=tr.querySelectorAll('td');if(c.length<10)return null;return{item_no:c[0].textContent.trim(),tag_ref:c[1].textContent.trim(),description:c[2].textContent.trim(),quantity:c[3].textContent.trim(),unit:c[4].textContent.trim(),category:c[5].textContent.trim(),manufacturer:c[6].textContent.trim(),part_model:c[7].textContent.trim(),voltage_rating:c[8].textContent.trim(),notes:c[9].textContent.trim()};}).filter(Boolean);}
 function dlCSV(type){const data=getTableData(type);const h=['Item no','Tag/ref','Description','Quantity','Unit','Category','Manufacturer','Part/model','Voltage/rating','Notes'];const rows=data.map(it=>[it.item_no,it.tag_ref,it.description,it.quantity,it.unit,it.category,it.manufacturer,it.part_model,it.voltage_rating,it.notes].map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(','));const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[h.join(','),...rows].join('\n')],{type:'text/csv'}));a.download=`${type}-bom.csv`;a.click();}
 function dlJSON(type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(getTableData(type),null,2)],{type:'application/json'}));a.download=`${type}-bom.json`;a.click();}
@@ -408,7 +493,7 @@ async function generateQuotation(){
   btn.disabled=true;btn.textContent='Generating…';status.textContent='';
   try{
     const res=await fetch('/api/quotation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      hvItems:hvData,lvItems:lvData,
+      hvItems:hvData.filter((_,i)=>hvIncluded[i]!==false),lvItems:lvData.filter((_,i)=>lvIncluded[i]!==false),
       meta:{to:document.getElementById('q-to').value,attention:document.getElementById('q-att').value,actqNo:document.getElementById('q-actq').value,re:document.getElementById('q-re').value}
     })});
     if(!res.ok)throw new Error(await res.text());
@@ -422,7 +507,7 @@ async function generateQuotation(){
   }catch(e){status.textContent='Error: '+e.message;}
   btn.disabled=false;btn.textContent='Download .docx';
 }
-function clearAll(){dFile=null;sFile=null;hvData=[];lvData=[];['d-pill','s-pill'].forEach(id=>document.getElementById(id).innerHTML='');['inp-d','inp-s'].forEach(id=>document.getElementById(id).value='');document.getElementById('status-area').innerHTML='';['hv','lv'].forEach(t=>{document.getElementById(`${t}-metrics`).style.display='none';document.getElementById(`${t}-body`).innerHTML=`<tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>${t==='hv'?'High':'Low'} voltage items will appear here</div></td></tr>`;});document.getElementById('btn-ex').disabled=true;document.getElementById('btn-quote').style.display='none';['hv-csv','hv-json','lv-csv','lv-json'].forEach(id=>document.getElementById(id).disabled=true);document.getElementById('btn-clear').style.display='none';}
+function clearAll(){dFile=null;sFile=null;hvData=[];lvData=[];hvIncluded=[];lvIncluded=[];['d-pill','s-pill'].forEach(id=>document.getElementById(id).innerHTML='');['inp-d','inp-s'].forEach(id=>document.getElementById(id).value='');document.getElementById('status-area').innerHTML='';['hv','lv'].forEach(t=>{document.getElementById(`${t}-metrics`).style.display='none';document.getElementById(`${t}-body`).innerHTML=`<tr><td colspan="10"><div class="empty"><svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>${t==='hv'?'High':'Low'} voltage items will appear here</div></td></tr>`;document.getElementById(`${t}-seldrop`).innerHTML='';document.getElementById(`${t}-seldrop`).classList.remove('open');document.getElementById(`${t}-selbtn`).textContent='☰ Select';});document.getElementById('btn-ex').disabled=true;document.getElementById('btn-quote').style.display='none';['hv-csv','hv-json','lv-csv','lv-json','hv-selbtn','lv-selbtn'].forEach(id=>document.getElementById(id).disabled=true);document.getElementById('btn-clear').style.display='none';}
 
 /* Chat file attachment */
 let chatAttachment=null;
@@ -496,8 +581,10 @@ Rules:
     catch(e){const match=raw.match(/\{[\s\S]*\}/);if(!match)throw new Error('Could not parse AI response.');try{parsed=JSON.parse(match[0]);}catch(e2){throw new Error('Malformed JSON: '+e2.message);}}
     hvData=parsed.hv_items||hvData;
     lvData=parsed.lv_items||lvData;
-    renderSection('hv',hvData);
-    renderSection('lv',lvData);
+    hvIncluded=hvData.map(()=>true);
+    lvIncluded=lvData.map(()=>true);
+    renderSection('hv');
+    renderSection('lv');
     updateActiveHistory();
     if(parsed.learned_rule){learnedRules.push(parsed.learned_rule);saveRules();thinking.textContent=(parsed.reply||'Done.')+' ✓ Rule saved: "'+parsed.learned_rule+'"';}else{thinking.textContent=parsed.reply||'Done.';}
   }catch(e){thinking.textContent='Error: '+e.message;}
